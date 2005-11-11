@@ -18,4 +18,6 @@ META.yml
 README
 t/01_compile.t
 t/02_basic.t
+t/10_regression.t
 t/99_pod.t
+t/data/10_regression/empty_files.tar.gz

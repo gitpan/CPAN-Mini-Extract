@@ -5,10 +5,10 @@ NAME
 SYNOPSIS
       # Create a CPAN extractor
       my $cpan = CPAN::Mini::Extract->new(
-          remote         => 'ftp://cpan.pair.com/pub/CPAN/',
+          remote         => 'http://mirrors.kernel.org/cpan/',
           local          => '/home/adam/.minicpan',
           trace          => 1,
-          extract        => '/home/adam/explosion',
+          extract        => '/home/adam/.cpanextracted',
           extract_filter => sub { /\.pm$/ and ! /\b(inc|t)\b/ },
           extract_check  => 1,
           );
