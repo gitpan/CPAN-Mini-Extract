@@ -1,5 +1,5 @@
 name: CPAN-Mini-Extract
-version: 0.12
+version: 0.13
 abstract: Create CPAN::Mini mirrors with the archives extracted
 author: Adam Kennedy <cpan@ali.as>
 license: perl

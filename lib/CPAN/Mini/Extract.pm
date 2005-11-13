@@ -70,7 +70,7 @@ use constant FFR  => 'File::Find::Rule';
 
 our $VERSION;
 BEGIN {
-	$VERSION = '0.12';
+	$VERSION = '0.13';
 }
 
 
@@ -323,10 +323,11 @@ sub mirror_extract {
 # And track what we have removed.
 sub clean_file {
 	my $self = shift;
-	my $file = shift;
+	my $file = shift; # Absolute
 
-	# Clean the expansion directory
-	$self->clean_extract( $file );
+	# Convert to relative path, and clear the expansion directory
+	my $relative = File::Spec->abs2rel( $file, $self->{local} );
+	$self->clean_extract( $relative );
 
 	# We are doing this in the reverse order to when we created it.
 	my $rv = $self->SUPER::clean_file($file, @_);
