@@ -19,7 +19,7 @@ CPAN::Mini::Extract - Create CPAN::Mini mirrors with the archives extracted
       );
   
   # Run the minicpan process
-  $cpan->run;
+  my $changes = $cpan->run;
 
 =head1 DESCRIPTION
 
@@ -61,16 +61,17 @@ use File::Path       'mkpath';
 use File::Remove     'remove';
 use List::Util       ();
 use IO::File         ();
-use IO::Zlib         (); # Will be needed by Archive::Tar
+use IO::Zlib         (); # Needed by Archive::Tar
 use Archive::Tar     ();
-use Params::Util     '_INSTANCE',
+use Params::Util     '_CODELIKE',
+                     '_INSTANCE',
                      '_ARRAY0';
 use File::Find::Rule ();
 use constant FFR  => 'File::Find::Rule';
 
 our $VERSION;
 BEGIN {
-	$VERSION = '0.13';
+	$VERSION = '1.15';
 }
 
 
@@ -184,7 +185,7 @@ sub new {
 	$self->{extract_check} = 1 if $self->{extract_force};
 
 	# Compile file_filters if needed
-	$self->_compile_filter('extract_filters');
+	$self->_compile_filter('extract_filter');
 
 	$self;
 }
@@ -203,6 +204,9 @@ sub new {
 The C<run> methods starts the main process, updating the minicpan mirror
 and extracted version, and then launching the PPI Processor to process the
 files in the source directory.
+
+Returns the number of changes made to the local minicpan and extracted
+directories, or dies on error.
 
 =cut
 
@@ -251,7 +255,7 @@ sub run {
 	}
 
 	$self->trace("Completed minicpan extraction\n");
-	return 1;
+	$changes;
 }
 
 
@@ -365,6 +369,9 @@ sub _compile_filter {
 
 	# Shortcut for "no filters"
 	return 1 unless $self->{$name};
+
+	# If the filter is already a code ref, shortcut
+	return 1 if _CODELIKE($self->{$name});
 
 	# Allow a single Regexp object for the filter
 	if ( _INSTANCE($self->{$name}, 'Regexp') ) {
@@ -506,21 +513,22 @@ For other issues, contact the maintainer
 
 =head1 AUTHOR
 
-Adam Kennedy E<gt>cpan@ali.asE<lt>, L<http://ali.as/>, 
+Adam Kennedy E<lt>cpan@ali.asE<gt>, L<http://ali.as/>, 
 
-Funding provided by The Perl Foundation
+Funding provided by The Perl Foundation.
+
+=head1 SEE ALSO
+
+L<CPAN::Mini>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2005 Adam Kennedy. All rights reserved.
+Copyright 2005, 2007 Adam Kennedy.
+
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 The full text of the license can be found in the
 LICENSE file included with this module.
-
-=head1 SEE ALSO
-
-L<CPAN::Mini>
 
 =cut

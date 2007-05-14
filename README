@@ -14,7 +14,7 @@ SYNOPSIS
           );
   
       # Run the minicpan process
-      $cpan->run;
+      my $changes = $cpan->run;
 
 DESCRIPTION
     "CPAN::Mini::Extract" provides a base for implementing systems that
@@ -111,6 +111,9 @@ METHODS
     and extracted version, and then launching the PPI Processor to process
     the files in the source directory.
 
+    Returns the number of changes made to the local minicpan and extracted
+    directories, or dies on error.
+
 SUPPORT
     Bugs should always be submitted via the CPAN bug tracker
 
@@ -119,18 +122,19 @@ SUPPORT
     For other issues, contact the maintainer
 
 AUTHOR
-    Adam Kennedy >cpan@ali.as<, <http://ali.as/>,
+    Adam Kennedy <cpan@ali.as>, <http://ali.as/>,
 
-    Funding provided by The Perl Foundation
-
-COPYRIGHT
-    Copyright (c) 2005 Adam Kennedy. All rights reserved. This program is
-    free software; you can redistribute it and/or modify it under the same
-    terms as Perl itself.
-
-    The full text of the license can be found in the LICENSE file included
-    with this module.
+    Funding provided by The Perl Foundation.
 
 SEE ALSO
     CPAN::Mini
+
+COPYRIGHT
+    Copyright 2005, 2007 Adam Kennedy.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
+    The full text of the license can be found in the LICENSE file included
+    with this module.
 
