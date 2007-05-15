@@ -53,12 +53,11 @@ maintainer while doing so.
 use 5.006;
 use strict;
 use base 'CPAN::Mini';
-use Carp             'croak',
-                     'carp';
+use Carp             ();
 use File::Spec       ();
-use File::Basename   'dirname';
-use File::Path       'mkpath';
-use File::Remove     'remove';
+use File::Basename   ();
+use File::Path       ();
+use File::Remove     ();
 use List::Util       ();
 use IO::File         ();
 use IO::Zlib         (); # Needed by Archive::Tar
@@ -66,12 +65,13 @@ use Archive::Tar     ();
 use Params::Util     '_CODELIKE',
                      '_INSTANCE',
                      '_ARRAY0';
+use LWP::Online      ();
 use File::Find::Rule ();
 use constant FFR  => 'File::Find::Rule';
 
 our $VERSION;
 BEGIN {
-	$VERSION = '1.15';
+	$VERSION = '1.16';
 }
 
 
@@ -161,24 +161,28 @@ Returns a new C<CPAN::Mini::Extract> object, or dies on error.
 =cut
 
 sub new {
-	my $class = ref $_[0] ? ref shift : shift;
+	my $class = shift;
 
 	# Call up to get the base object
-	my $self = $class->SUPER::new(
-		offline => 0,
-		@_ );
+	my %params = @_;
+	unless ( defined $params{offline} ) {
+		$params{offline} = LWP::Online::offline();
+	}
+	my $self = $class->SUPER::new( %params );
 
 	# Check the extract param
-	$self->{extract} or croak(
+	$self->{extract} or Carp::croak(
 		"Did not provide an 'extract' path"
 		);
 	if ( -e $self->{extract} ) {
-		-d _ and -w _ or croak(
-			"The 'extract' path is not a writable directory"
-			);
+		unless ( -d _ and -w _ ) {
+			Carp::croak(
+				"The 'extract' path is not a writable directory"
+				);
+		}
 	} else {
-		mkpath( $self->{extract}, $self->{trace}, $self->{dirmode} )
-			or croak("The 'extract' path could not be created");
+		File::Path::mkpath( $self->{extract}, $self->{trace}, $self->{dirmode} )
+			or Carp::croak("The 'extract' path could not be created");
 	}
 
 	# Set defaults and apply rules
@@ -219,6 +223,20 @@ sub run {
 	$self->{added}   = {};
 	$self->{cleaned} = {};
 
+	# If we want to force re-expansion,
+	# remove all current expansion dirs.
+	if ( $self->{extract_force} ) {
+		$self->trace("Flushing all expansion directories (extract_force enabled)\n");
+		my $authors_dir = File::Spec->catfile( $self->{extract}, 'authors' );
+		if ( -e $authors_dir ) {
+			$self->trace("Removing $authors_dir...");
+			File::Remove::remove( \1, $authors_dir ) or Carp::croak(
+				"Failed to remove previous expansion directory '$authors_dir'"
+				);
+			$self->trace(" removed\n");
+		}
+	}
+
 	# Update the CPAN::Mini local mirror
 	if ( $self->{offline} ) {
 		$self->trace("Skipping MiniCPAN update (offline mode enabled)\n");
@@ -228,7 +246,7 @@ sub run {
 	}
 
 	$changes ||= 0;
-	if ( $self->{extract_check} and ! $self->{extract_force} ) {
+	if ( $self->{extract_check} and $self->{extract_force} ) {
 		# Expansion checking is enabled, and we didn't do a normal
 		# forced check, so find the full list of files to check.
 		$self->trace("Tarball expansion checking enabled\n");
@@ -264,29 +282,6 @@ sub run {
 
 #####################################################################
 # CPAN::Mini Methods
-
-# If doing forced expansion, remove the old extracted files
-# before beginning the mirror update so we don't have to redelete
-# and create the ones we do during the update.
-sub update_mirror {
-	my $self = shift;
-
-	# If we want to force re-expansion,
-	# remove all current expansion dirs.
-	if ( $self->{extract_force} ) {
-		$self->trace("Flushing all expansion directories (extract_force enabled)\n");
-		my $authors_dir = File::Spec->catfile( $self->{extract}, 'authors' );
-		if ( -e $authors_dir ) {
-			$self->trace("Removing $authors_dir");
-			remove( \1, $authors_dir ) or croak(
-				"Failed to remove previous expansion directory '$authors_dir'"
-				);
-			$self->trace(" ... removed\n");
-		}
-	}
-
-	$self->SUPER::update_mirror(@_);
-}
 
 # Track what we have added
 sub mirror_file {
@@ -327,7 +322,7 @@ sub mirror_extract {
 # And track what we have removed.
 sub clean_file {
 	my $self = shift;
-	my $file = shift; # Absolute
+	my $file = shift; # Absolute path
 
 	# Convert to relative path, and clear the expansion directory
 	my $relative = File::Spec->abs2rel( $file, $self->{local} );
@@ -347,7 +342,7 @@ sub clean_extract {
 	# Remove the source directory, if it exists
 	my $source_path = File::Spec->catfile( $self->{extract}, $file );
 	if ( -e $source_path ) {
-		remove( \1, $source_path ) or carp(
+		File::Remove::remove( \1, $source_path ) or Carp::carp(
 			"Cannot remove $source_path $!"
 			);
 	}
@@ -379,11 +374,11 @@ sub _compile_filter {
 	}
 
 	# Check for bad cases
-	_ARRAY0($self->{$name}) or croak(
+	_ARRAY0($self->{$name}) or Carp::croak(
 		"$name is not an ARRAY reference"
 		);
 	unless ( @{$self->{$name}} ) {
-		delete $self->{file_filters};
+		delete $self->{$name};
 		return 1;
 	}
 
@@ -395,11 +390,11 @@ sub _compile_filter {
 
 	# Build the anonymous sub
 	$self->{$name} = sub {
-			foreach my $regexp ( @filters ) {
-				return '' if $_ =~ $regexp;
-			}
-			1;
-		};
+		foreach my $regexp ( @filters ) {
+			return 1 if $_ =~ $regexp;
+		}
+		return '';
+	};
 
 	1;
 }
@@ -409,7 +404,7 @@ sub _extract_archive {
 	my ($self, $archive, $to) = @_;
 
 	my @contents;
-	{
+	SCOPE: {
 		local $Archive::Tar::WARN = 0;
 		@contents = eval {
 			Archive::Tar->list_archive( $archive, undef, [ 'name', 'size' ] );
@@ -420,55 +415,52 @@ sub _extract_archive {
 	}
 
 	# Filter to get just the ones we want
-	@contents = grep {
-		$_->{size} # No dirs or null files
-		and
-		$_->{name} =~ /\.(?:pm|pl|t)$/ # Just "Perl" files.
-		} @contents;
-	@contents = map { $_->{name} } @contents;
-	if ( $self->{file_filters} ) {
-		@contents = grep &{$self->{file_filters}}, @contents;
+	@contents = map { $_->{name} } grep { $_->{size} } @contents;
+	if ( $self->{extract_filter} ) {
+		@contents = grep &{$self->{extract_filter}}, @contents;
 	}
 
 	unless ( @contents ) {
 		# Create an empty directory so it isn't checked over and over
-		mkpath( $to, $self->{trace}, $self->{dirmode} );
+		File::Path::mkpath( $to, $self->{trace}, $self->{dirmode} );
 		return 1;
 	}
 
 	# Extract the needed files
 	my $tar;
-	{
+	SCOPE: {
 		local $Archive::Tar::WARN = 0;
 		$tar = eval {
 			Archive::Tar->new( $archive );
 			};
 	}
-	return $self->_tar_error() if ( $@ or ! $tar );
+	if ( $@ or ! $tar ) {
+		return $self->_tar_error;
+	}
 
 	# Iterate and extract each file
 	foreach my $wanted ( @contents ) {
 		# Where to extract to
 		my $to_file = File::Spec->catfile( $to, $wanted );
-		my $to_dir  = dirname( $to_file );
-		mkpath( $to_dir, $self->{trace}, $self->{dirmode} );
+		my $to_dir  = File::Basename::dirname( $to_file );
+		File::Path::mkpath( $to_dir, $self->{trace}, $self->{dirmode} );
 		$self->trace("    $wanted");
 
 		my $rv;
-		{
+		SCOPE: {
 			local $Archive::Tar::WARN  = 0;
 			local $Archive::Tar::CHOWN = 0;
 			local $Archive::Tar::CHMOD = 0;
 			$rv = eval {
 				$tar->extract_file( $wanted, $to_file );
-				};
+			};
 		}
 		if ( $@ or ! $rv ) {
 			# There was an error during the extraction
 			$self->_tar_error( " ... failed" );
 			if ( -e $to_file ) {
 				# Remove any partial file left behind
-				remove( $to_file );
+				File::Remove::remove( $to_file );
 			}
 			return 1;
 		}

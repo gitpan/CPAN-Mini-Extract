@@ -19,13 +19,14 @@ requires:
   CPAN::Mini: 0.550
   Carp: 0
   File::Basename: 0
-  File::Find::Rule: 0.27
+  File::Find::Rule: 0.30
   File::Path: 0
   File::Remove: 0.34
   File::Spec: 0.80
   IO::File: 0
   IO::Zlib: 1.04
+  LWP::Online: 0.03
   List::Util: 1.15
   Params::Util: 0.20
   perl: 5.6.0
-version: 1.15
+version: 1.16
