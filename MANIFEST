@@ -16,5 +16,7 @@ README
 t/01_compile.t
 t/02_basic.t
 t/10_regression.t
-t/99_author.t
+t/97_meta.t
+t/98_pod.t
+t/99_pmv.t
 t/data/10_regression/empty_files.tar.gz
