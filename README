@@ -11,7 +11,7 @@ SYNOPSIS
           extract        => '/home/adam/.cpanextracted',
           extract_filter => sub { /\.pm$/ and ! /\b(inc|t)\b/ },
           extract_check  => 1,
-          );
+      );
   
       # Run the minicpan process
       my $changes = $cpan->run;
